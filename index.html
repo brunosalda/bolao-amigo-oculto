@@ -66,8 +66,8 @@ footer{text-align:center;margin-top:24px}
   <footer><button class="link" id="abrirAdmin">Área do organizador</button></footer>
 </main>
 <script>
-const SUPABASE_URL = '%%SUPABASE_URL%%';
-const SUPABASE_KEY = '%%SUPABASE_KEY%%';
+const SUPABASE_URL = 'https://uwriyzilfyluvdapzorm.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_xDs1oiZ7DUMmdQcR2P0sQw_Wk28UPSN';
 const NOMES = ['Andressa','Bruno','Cadu','Iris','Luciana'];
 const VALOR = 10;
 
@@ -94,7 +94,7 @@ const st = { quem: '', g: {}, enviado: ld('bolao_enviado', '') };
 
 async function carregarRespostas(){
   try {
-    const rows = await api('rpc/quem_respondeu');
+    const rows = await api('rpc/bolao_quem_respondeu');
     respondidos = {}; (rows || []).forEach(r => respondidos[r.nome] = r.criado_em);
     renderRespostas();
     if (!st.quem || st.enviado || respondidos[st.quem]) { if (respondidos[st.quem] && !st.enviado) st.quem = ''; renderForm(); }
@@ -145,7 +145,7 @@ async function enviar(){
   const btn = $('#enviar'); btn.disabled = true; btn.textContent = 'Enviando…';
   const g = {}; outros.forEach(n => g[n] = st.g[n]);
   try {
-    await api('palpites', { nome: st.quem, palpites: g }, { Prefer: 'return=minimal' });
+    await api('bolao_palpites', { nome: st.quem, palpites: g }, { Prefer: 'return=minimal' });
     st.enviado = st.quem; sv('bolao_enviado', st.quem);
     await carregarRespostas();
   } catch(e){
@@ -166,7 +166,7 @@ function renderAdmin(){
       <div id="erroS" class="err"></div><button class="primary" id="entrar">Abrir palpites</button></div>`;
     $('#entrar').onclick = async () => {
       try {
-        const rows = await api('rpc/revelar', { senha: $('#senha').value });
+        const rows = await api('rpc/bolao_revelar', { senha: $('#senha').value });
         if (!rows) throw new Error('senha');
         lista = rows; renderAdmin();
       } catch(e){ $('#erroS').textContent = 'Senha incorreta.'; }
