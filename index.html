@@ -95,6 +95,7 @@ async function carregarRespostas(){
   try {
     const rows = await api('rpc/bolao_quem_respondeu');
     respondidos = {}; (rows || []).forEach(r => respondidos[r.nome] = r.criado_em);
+    if (st.enviado && !respondidos[st.enviado]) { st.enviado = ''; st.quem = ''; st.g = {}; sv('bolao_enviado', ''); }
     renderRespostas();
     if (!st.quem || st.enviado || respondidos[st.quem]) { if (respondidos[st.quem] && !st.enviado) st.quem = ''; renderForm(); }
   } catch(e){ $('#contador').textContent = 'Não consegui carregar as respostas agora. Tente atualizar a página.'; }
