@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Bolão do Amigo Oculto</title>
+<meta name="robots" content="noindex">
+<style>
+:root{--bg:#f5f3ee;--card:#fff;--ink:#1e2320;--muted:#69706b;--line:#e2ded5;--accent:#1d6b47;--accent-ink:#fff;--soft:#e8f2ec;--bad:#b3362d;--warn:#8a5d00;--warn-bg:#fbf1dc}
+@media (prefers-color-scheme:dark){:root{--bg:#121514;--card:#1b1f1d;--ink:#eceae4;--muted:#9ba29d;--line:#2e3431;--accent:#4dbb86;--accent-ink:#0e1a14;--soft:#1f3329;--bad:#e46a60;--warn:#e3b24f;--warn-bg:#2f2817}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+main{max-width:600px;margin:0 auto;padding:22px 16px 56px}
+h1{font-size:1.55rem;margin:0 0 4px;letter-spacing:-.01em}
+h2{font-size:1.05rem;margin:0 0 8px}
+.sub{color:var(--muted);margin:0 0 18px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px;margin-bottom:14px}
+.hint{color:var(--muted);font-size:.92rem;margin:0 0 12px}
+label.lbl{display:block;font-weight:600;margin-bottom:6px}
+select,input{width:100%;font:inherit;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:10px 12px}
+.row{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.2fr);gap:10px;align-items:center;padding:7px 0;border-top:1px solid var(--line)}
+.row:first-of-type{border-top:0}
+.who{font-weight:600;overflow-wrap:anywhere}
+button{font:inherit;font-weight:600;border-radius:10px;padding:11px 16px;cursor:pointer}
+button.primary{background:var(--accent);color:var(--accent-ink);border:0;width:100%;margin-top:12px}
+button.primary:disabled{opacity:.6;cursor:default}
+button.link{background:none;border:0;color:var(--muted);padding:6px 0;text-decoration:underline;font-weight:500}
+.warn{background:var(--warn-bg);color:var(--warn);border-radius:10px;padding:10px 12px;font-size:.92rem;margin-top:12px}
+.warn:empty,.err:empty{display:none}
+.err{color:var(--bad);font-size:.92rem;margin-top:10px}
+.okbox{background:var(--soft);border-radius:12px;padding:14px;text-align:center}
+.okbox strong{display:block;font-size:1.1rem;margin-bottom:4px}
+.list{list-style:none;margin:0;padding:0}
+.list li{display:flex;justify-content:space-between;gap:10px;padding:8px 0;border-top:1px solid var(--line);font-size:.95rem}
+.list li:first-child{border-top:0}
+.muted{color:var(--muted)}
+.y{color:var(--accent)}.n{color:var(--bad)}
+.rank{border-top:1px solid var(--line);padding:10px 0}
+.rank:first-child{border-top:0}
+.rank-top{display:flex;justify-content:space-between;align-items:baseline;gap:10px}
+.rank-name{font-weight:700}
+.pts{font-variant-numeric:tabular-nums;font-weight:700}
+.win{background:var(--soft);border-radius:10px;padding:10px 12px;margin:-2px -4px}
+.det{font-size:.88rem;color:var(--muted);margin-top:4px}
+.det span{display:inline-block;margin-right:10px}
+.banner{font-size:1.05rem;margin:0 0 10px}
+.hidden{display:none}
+footer{text-align:center;margin-top:24px}
+</style>
+</head>
+<body>
+<main>
+  <h1>Bolão do Amigo Oculto 🎁</h1>
+  <p class="sub">Cada um chuta quem os colegas tiraram. Quem acertar mais leva o pote.</p>
+
+  <div class="card">
+    <h2>Quem já respondeu</h2>
+    <p class="hint" id="contador">Carregando…</p>
+    <ul class="list" id="respostas"></ul>
+  </div>
+
+  <div id="form"></div>
+
+  <div id="admin" class="hidden"></div>
+
+  <footer><button class="link" id="abrirAdmin">Área do organizador</button></footer>
+</main>
+<script>
+const SUPABASE_URL = '%%SUPABASE_URL%%';
+const SUPABASE_KEY = '%%SUPABASE_KEY%%';
+const NOMES = ['Andressa','Bruno','Cadu','Iris','Luciana'];
+const VALOR = 10;
+
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const brl = v => Number(v).toLocaleString('pt-BR', {style:'currency', currency:'BRL'});
+const hora = t => { try { return new Date(t).toLocaleString('pt-BR', {day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit'}); } catch(e){ return ''; } };
+function ld(k,d){ try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : d; } catch(e){ return d; } }
+function sv(k,v){ try { localStorage.setItem(k, JSON.stringify(v)); } catch(e){} }
+
+async function api(path, body, extra = {}){
+  const headers = { apikey: SUPABASE_KEY, 'Content-Type': 'application/json', ...extra };
+  if (SUPABASE_KEY.startsWith('eyJ')) headers.Authorization = 'Bearer ' + SUPABASE_KEY;
+  const r = await fetch(SUPABASE_URL + '/rest/v1/' + path, { method: 'POST', headers, body: JSON.stringify(body || {}) });
+  const txt = await r.text();
+  let data = null; try { data = txt ? JSON.parse(txt) : null; } catch(e){}
+  if (!r.ok) { const e = new Error((data && data.message) || ('Erro ' + r.status)); e.code = data && data.code; throw e; }
+  return data;
+}
+
+/* ---------- quem respondeu ---------- */
+let respondidos = {};
+const st = { quem: '', g: {}, enviado: ld('bolao_enviado', '') };
+
+async function carregarRespostas(){
+  try {
+    const rows = await api('rpc/quem_respondeu');
+    respondidos = {}; (rows || []).forEach(r => respondidos[r.nome] = r.criado_em);
+    renderRespostas();
+    if (!st.quem || st.enviado || respondidos[st.quem]) { if (respondidos[st.quem] && !st.enviado) st.quem = ''; renderForm(); }
+  } catch(e){ $('#contador').textContent = 'Não consegui carregar as respostas agora. Tente atualizar a página.'; }
+}
+function renderRespostas(){
+  const n = Object.keys(respondidos).length;
+  $('#contador').textContent = n === NOMES.length ? `Todo mundo respondeu! 🎉` : `${n} de ${NOMES.length} palpites recebidos`;
+  $('#respostas').innerHTML = NOMES.map(nm => respondidos[nm]
+    ? `<li><span><span class="y">✓</span> <strong>${esc(nm)}</strong></span><span class="muted">respondeu ${hora(respondidos[nm])}</span></li>`
+    : `<li><span><span class="muted">○</span> <strong>${esc(nm)}</strong></span><span class="muted">aguardando</span></li>`).join('');
+}
+
+/* ---------- formulário ---------- */
+function renderForm(){
+  const el = $('#form');
+  if (st.enviado){
+    el.innerHTML = `<div class="card"><div class="okbox"><strong>Palpite enviado, ${esc(st.enviado)}!</strong>Ninguém consegue ver seus chutes. Agora é esperar a revelação.</div></div>`;
+    return;
+  }
+  const livres = NOMES.filter(n => !respondidos[n]);
+  if (!livres.length){ el.innerHTML = ''; return; }
+  let h = `<div class="card"><h2>Enviar meu palpite</h2><label class="lbl" for="quem">Quem é você?</label>
+    <select id="quem"><option value="">Escolha seu nome</option>${livres.map(n => `<option ${n===st.quem?'selected':''}>${esc(n)}</option>`).join('')}</select>`;
+  if (st.quem){
+    h += `<p class="hint" style="margin-top:14px">Para cada colega, escolha quem você acha que ele tirou. Lembre: ninguém tira a si mesmo, e ninguém além de você tirou quem você tirou.</p>`;
+    NOMES.filter(n => n !== st.quem).forEach(n => {
+      h += `<div class="row"><span class="who">${esc(n)} tirou</span><select data-g="${esc(n)}"><option value="">Escolha</option>${NOMES.filter(x => x !== n).map(x => `<option ${st.g[n]===x?'selected':''}>${esc(x)}</option>`).join('')}</select></div>`;
+    });
+    h += `<div id="aviso" class="warn"></div><div id="erro" class="err"></div>
+      <button class="primary" id="enviar">Enviar palpite</button>
+      <p class="hint" style="margin-top:8px;text-align:center">Depois de enviar não dá para mudar.</p>`;
+  }
+  el.innerHTML = h + `</div>`;
+  $('#quem').onchange = e => { st.quem = e.target.value; st.g = {}; renderForm(); };
+  el.querySelectorAll('select[data-g]').forEach(s => s.onchange = () => { st.g[s.dataset.g] = s.value; aviso(); });
+  if (st.quem){ aviso(); $('#enviar').onclick = enviar; }
+}
+function aviso(){
+  const vals = Object.values(st.g).filter(Boolean);
+  const dup = [...new Set(vals.filter((v,i) => vals.indexOf(v) !== i))];
+  $('#aviso').textContent = dup.length ? `Atenção: ${dup.join(', ')} aparece mais de uma vez. No amigo oculto cada pessoa é tirada só uma vez.` : '';
+}
+async function enviar(){
+  const outros = NOMES.filter(n => n !== st.quem);
+  const falta = outros.filter(n => !st.g[n]);
+  if (falta.length){ $('#erro').textContent = 'Falta palpite para: ' + falta.join(', '); return; }
+  const btn = $('#enviar'); btn.disabled = true; btn.textContent = 'Enviando…';
+  const g = {}; outros.forEach(n => g[n] = st.g[n]);
+  try {
+    await api('palpites', { nome: st.quem, palpites: g }, { Prefer: 'return=minimal' });
+    st.enviado = st.quem; sv('bolao_enviado', st.quem);
+    await carregarRespostas();
+  } catch(e){
+    btn.disabled = false; btn.textContent = 'Enviar palpite';
+    $('#erro').textContent = e.code === '23505' ? `${st.quem} já enviou palpite. Se não foi você, fale com o organizador.` : 'Não consegui enviar. Verifique a internet e tente de novo.';
+    if (e.code === '23505') carregarRespostas();
+  }
+}
+
+/* ---------- organizador ---------- */
+let lista = null; let revel = ld('bolao_revel', {});
+$('#abrirAdmin').onclick = () => { $('#admin').classList.toggle('hidden'); renderAdmin(); };
+function renderAdmin(){
+  const el = $('#admin');
+  if (!lista){
+    el.innerHTML = `<div class="card"><h2>Área do organizador</h2><p class="hint">Use só na hora da revelação.</p>
+      <label class="lbl" for="senha">Senha</label><input id="senha" type="password" autocomplete="current-password">
+      <div id="erroS" class="err"></div><button class="primary" id="entrar">Abrir palpites</button></div>`;
+    $('#entrar').onclick = async () => {
+      try {
+        const rows = await api('rpc/revelar', { senha: $('#senha').value });
+        if (!rows) throw new Error('senha');
+        lista = rows; renderAdmin();
+      } catch(e){ $('#erroS').textContent = 'Senha incorreta.'; }
+    };
+    return;
+  }
+  el.innerHTML = `<div class="card"><h2>Revelação: quem tirou quem</h2>
+    <p class="hint">${lista.length} palpite(s) carregado(s). Marque o que foi revelado no amigo oculto.</p>
+    ${NOMES.map(n => `<div class="row"><span class="who">${esc(n)} tirou</span><select data-r="${esc(n)}"><option value="">Escolha</option>${NOMES.filter(x => x!==n).map(x => `<option ${revel[n]===x?'selected':''}>${esc(x)}</option>`).join('')}</select></div>`).join('')}
+    <div id="erroR" class="err"></div><button class="primary" id="calc">Calcular resultado</button></div><div id="placar"></div>`;
+  el.querySelectorAll('select[data-r]').forEach(s => s.onchange = () => { revel[s.dataset.r] = s.value; sv('bolao_revel', revel); });
+  $('#calc').onclick = calcular;
+}
+function calcular(){
+  const err = $('#erroR'); err.textContent = '';
+  const falta = NOMES.filter(n => !revel[n]);
+  if (falta.length){ err.textContent = 'Falta preencher quem estas pessoas tiraram: ' + falta.join(', '); return; }
+  const alvos = NOMES.map(n => revel[n]);
+  const dup = [...new Set(alvos.filter((v,i) => alvos.indexOf(v) !== i))];
+  if (dup.length){ err.textContent = dup.join(', ') + ' aparece mais de uma vez. Confira.'; return; }
+  if (!lista.length){ err.textContent = 'Ninguém enviou palpite.'; return; }
+  const placar = lista.map(p => {
+    const det = Object.entries(p.palpites).map(([quem, chute]) => ({ quem, chute, ok: revel[quem] === chute }));
+    return { de: p.nome, pts: det.filter(d => d.ok).length, max: det.length, det };
+  }).sort((a,b) => b.pts - a.pts || a.de.localeCompare(b.de));
+  const top = placar[0].pts;
+  const ganh = top > 0 ? placar.filter(p => p.pts === top) : [];
+  const pote = VALOR * NOMES.length;
+  let banner;
+  if (!ganh.length) banner = `Ninguém acertou nada. O pote de ${brl(pote)} fica para o que vocês combinaram.`;
+  else if (ganh.length === 1) banner = `<strong>${esc(ganh[0].de)}</strong> leva o pote de <strong>${brl(pote)}</strong> com ${top} acerto${top>1?'s':''}.`;
+  else banner = `Empate entre <strong>${esc(ganh.map(g => g.de).join(', '))}</strong> com ${top} acerto${top>1?'s':''}. Cada um leva <strong>${brl(pote/ganh.length)}</strong>.`;
+  $('#placar').innerHTML = `<div class="card"><h2>Placar</h2><p class="banner">${banner}</p>
+    ${placar.map(p => `<div class="rank"><div class="${ganh.includes(p)?'win':''}">
+      <div class="rank-top"><span class="rank-name">${esc(p.de)}</span><span class="pts">${p.pts} de ${p.max}</span></div>
+      <div class="det">${p.det.map(d => `<span class="${d.ok?'y':'n'}">${d.ok?'✓':'✗'} ${esc(d.quem)} → ${esc(d.chute)}</span>`).join('')}</div>
+    </div></div>`).join('')}</div>`;
+  $('#placar').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+renderRespostas(); carregarRespostas();
+setInterval(() => { if (!document.hidden) carregarRespostas(); }, 20000);
+</script>
+</body>
+</html>
