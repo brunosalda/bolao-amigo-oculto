@@ -63,7 +63,6 @@ footer{text-align:center;margin-top:24px}
 
   <div id="admin" class="hidden"></div>
 
-  <footer><button class="link" id="abrirAdmin">Área do organizador</button></footer>
 </main>
 <script>
 const SUPABASE_URL = 'https://uwriyzilfyluvdapzorm.supabase.co';
@@ -157,7 +156,8 @@ async function enviar(){
 
 /* ---------- organizador ---------- */
 let lista = null; let revel = ld('bolao_revel', {});
-$('#abrirAdmin').onclick = () => { $('#admin').classList.toggle('hidden'); renderAdmin(); };
+function rota(){ const on = location.hash === '#organizador'; $('#admin').classList.toggle('hidden', !on); if (on) renderAdmin(); }
+window.addEventListener('hashchange', rota); rota();
 function renderAdmin(){
   const el = $('#admin');
   if (!lista){
